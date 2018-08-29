@@ -1,0 +1,180 @@
+<h2><center>Richard's Weather Forecast v1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</center></h2>
+<hr style="color:black;">
+
+<!-- CSS-style layout control is used for the form. -->
+<form id="SearchForm" name="SearchForm" action="/weather">
+  <fieldset name="search_parameters" id="search_parameters_fieldset" >
+    <big><b>Enter either:</b></big><br>
+	   
+    <label for="address_input" style="font-weight:normal; margin-left:20px; margin-top:6px">Street Address:</label>
+	<input type="text" name="address" id="address_input" value="<%= @address %>" style="margin-left: 6px"> (Optional)<br>
+
+    <label for="city_input" style="font-weight:normal; margin-left:20px; margin-top:6px">City:</label>
+	<input type="text" name="city" id="city_input" value="<%= @city %>" style="margin-left: 74px"><br>
+
+    <label for="state_input" style="font-weight:normal; margin-left:20px; margin-top:6px">State:</label>
+    <input type="text" name="state" id="state_input" value="<%= @state %>" style="margin-left:65px"> (2 letters)<br>
+    
+	<big><b>or:</big></b><br>
+    
+    <label for="zipcode_input" style="font-weight:normal; margin-left:20px; margin-top:6px">ZIP Code:</label>
+	<input type="text" name="zipcode" id="zipcode_input" value="<%= @zipcode %>" style="margin-left:38px"> (5 digits)<br><br>
+	
+    <big>
+	<button name="Search" type="submit" value="submit-true" style="margin-left:80px">Search</button>
+	<button name="Clear" accesskey="c" type="button" onclick="clearSearchParameters()" style="margin-left:10px"><u>C</u>lear</button>
+	</big>
+	<br>
+	
+	<div style="margin-left:20px; margin-top:14px">Options:</div>
+	
+    <label for="days_requested_spinner" style="font-weight:normal; margin-left:50px">Displayed Forecast Days:</label>
+	<input type="number" step="1" min="1" max="14" name="days_requested" id="days_requested_spinner" style="width:50px; padding-left:5px"
+	  value="<%= @days_requested %>"><br>
+    
+	<div style="margin-left:50px; margin-top:4px; margin-bottom:4px">Temperature Scale:</div>
+	
+    <input type="radio" name="temperature_scale" id="display_fahrenheit" value="fahrenheit" style="margin-left:80px"
+      <%= if (@temperature_scale == "fahrenheit"), do: "checked", else: "" %>>
+	<label for="display_fahrenheit" style="font-weight:normal">Fahrenheit</label>
+
+    <input type="radio" name="temperature_scale" id="display_celsius" value="celsius" style="margin-left:10px"
+      <%= if (@temperature_scale == "celsius"), do: "checked", else: "" %>>
+	<label for="display_celsius" style="font-weight:normal">Celsius</label>
+
+    <input type="radio" name="temperature_scale" id="display_kelvins" value="kelvins" style="margin-left:10px"
+      <%= if (@temperature_scale == "kelvins"), do: "checked", else: "" %>>
+	<label for="display_kelvins" style="font-weight:normal">Kelvins</label>
+  </fieldset>
+</form>
+
+<!-- Just a little embedded JavaScript. (Because form reset doesn't actually clear the fields.) -->
+<script>
+function clearSearchParameters() {
+  document.getElementById("address_input").value="";
+  document.getElementById("city_input").value="";
+  document.getElementById("state_input").value="";
+  document.getElementById("zipcode_input").value="";
+  }
+</script>
+
+<!-- Old-style layout control is used for the forecast results. (Because I got tired of messing with HTML... :-) -->
+<!-- But there's plenty of cool stuff in this section without it. Note the Elixir for loop embedded in the Phoenix template
+     to dynamically display the requested number of forecast days. And note the super-sweet mapping and indexing into the 
+	 decoded JSON block for forecast data. No custom code was needed to create this nested Elixir data map. It would be very 
+	 easy to add more weather items to the display. They're already in the returned data structure. Just write the HTML to 
+	 display them and then map into @data to get the values. (Like I did for the daily "conditions" below.) Sweet! -->
+<hr>
+<b>Query Status:</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<%= @query_status %><br>
+<%= if String.length(@error_msg) > 0 do %>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="red"><%= @error_msg %></font><br>
+<% end %>
+
+<%= if @query_status == "Success" and @data != nil do %>
+  <b>Forecast Status:</b><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Cached? <%= @cached? %><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;When Fetched: <%= WeatherServer.format_with_tz_offset(@when_fetched) %><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Days Fetched: <%= @days_fetched %><br>
+
+  <b>Current Weather:</b><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Location: <font color="red">
+    <%= "#{@data["location"]["name"]}, #{@data["location"]["region"]}, #{@data["location"]["country"]} #{@fetched_zipcode}" %></font><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Local Time: <%= "#{@data["location"]["localtime"]}" %><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Conditions: <%= "#{@data["current"]["condition"]["text"]}" %><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Temperature: 
+  <%= case @temperature_scale do
+    "fahrenheit" -> "#{@data["current"]["temp_f"]} F"
+    "celsius"    -> "#{@data["current"]["temp_c"]} C"
+    "kelvins"    -> "#{Float.round(@data["current"]["temp_c"] + 273.15,1)} K" 
+    end
+  %>
+  <br>
+
+  <b>Forecast Weather:</b><br>
+  <%= if @days_fetched > 0 do %>
+    <%= for i <- 0..(@days_requested-1) do %>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+    <%= Enum.at(@data["forecast"]["forecastday"],i)["date"] %>
+    &nbsp;&nbsp; High: 
+    <%= case @temperature_scale do
+      "fahrenheit" -> "#{Enum.at(@data["forecast"]["forecastday"],i)["day"]["maxtemp_f"]} F"
+      "celsius"    -> "#{Enum.at(@data["forecast"]["forecastday"],i)["day"]["maxtemp_c"]} C"
+      "kelvins"    -> "#{Float.round(Enum.at(@data["forecast"]["forecastday"],i)["day"]["maxtemp_c"] + 273.15,1)} K" 
+    end 
+    %>
+    &nbsp;&nbsp; Low: 
+    <%= case @temperature_scale do
+      "fahrenheit" -> "#{Enum.at(@data["forecast"]["forecastday"],i)["day"]["mintemp_f"]} F"
+      "celsius"    -> "#{Enum.at(@data["forecast"]["forecastday"],i)["day"]["mintemp_c"]} C"
+      "kelvins"    -> "#{Float.round(Enum.at(@data["forecast"]["forecastday"],i)["day"]["maxtemp_c"] + 273.15,1)} K" 
+    end
+    %>
+    &nbsp;&nbsp; Conditions: <%= Enum.at(@data["forecast"]["forecastday"],i)["day"]["condition"]["text"] %>
+    <br>
+    <% end %>
+  <% end %>
+<% end %>
+
+<hr>
+Free weather forecasts courtesy of apixu.com.<br>
+Free ZIP code lookups by city-state courtesy of zippopotam.us.<br>
+Free ZIP code lookups by address courtesy of usps.com.<br>
+
+<!-- Originally I used this datalist as the source for a drop-down list of states. But I couldn't get the drop-down to correctly
+     the display the selected state when the page was refreshed with the query results. Sigh! I do hate HTML... -->
+<!-- Of course, such a list shouldn't be hard-coded into the HTML template. But that's an enhancement for v2. -->	 
+<datalist id="states">
+  <option value="AL - Alabama">
+  <option value="AK - Alaska">
+  <option value="AR - Arkansas">
+  <option value="AZ - Arizona">
+  <option value="CA - California">
+  <option value="CO - Colorado">
+  <option value="CT - Connecticut">
+  <option value="DC - District of Columbia">
+  <option value="DE - Delaware">
+  <option value="FL - Florida">
+  <option value="GA - Georgia">
+  <option value="HI - Hawaii">
+  <option value="IA - Iowa">
+  <option value="ID - Idaho">
+  <option value="IL - Illinois">
+  <option value="IN - Indiana">
+  <option value="KS - Kansas">
+  <option value="KY - Kentucky" selected>
+  <option value="LA - Louisiana">
+  <option value="MA - Massachusetts">
+  <option value="MD - Maryland">
+  <option value="ME - Maine">
+  <option value="MI - Michigan">
+  <option value="MN - Minnesota">
+  <option value="MO - Missouri">
+  <option value="MS - Mississippi">
+  <option value="MT - Montana">
+  <option value="NC - North Carolina">
+  <option value="ND - North Dakota">
+  <option value="NE - Nebraska">
+  <option value="NH - New Hampshire">
+  <option value="NJ - New Jersey">
+  <option value="NM - New Mexico">
+  <option value="NY - New York">
+  <option value="NV - Nevada">
+  <option value="OH - Ohio">
+  <option value="OK - Oklahoma">
+  <option value="OR - Oregon">
+  <option value="PA - Pennsylvania">
+  <option value="PR - Puerto Rico">
+  <option value="RI - Rhode Island">
+  <option value="SC - South Carolina">
+  <option value="SD - South Dakota">
+  <option value="TN - Tennessee">
+  <option value="TX - Texas">
+  <option value="UT - Utah">
+  <option value="VA - Virginia">
+  <option value="VT - Vermont">
+  <option value="WA - Washington">
+  <option value="WI - Wisconsin">
+  <option value="WV - West Virginia">
+  <option value="WY - Wyoming">
+</datalist>

@@ -1,0 +1,34 @@
+
+Elixir Build Instructions for Richard's Weather Server and Weather Page (28-Aug-2018)
+-----------------------------------------------------------------------
+
+[The following steps assume that you have already installed Elixir, Phoenix, Brunch, and npm.]
+
+Copy the "richard.zip" file to your "projects" directory and unzip it.
+(It will create a subdirectory called "richard".)
+
+cd projects/richard/weather_server
+mix deps.get
+mix compile
+
+[If you want to test the standalone WeatherServer:]
+iex -S mix  
+iex> {:ok, pid} = WeatherServer.start_link([])
+iex> WeatherServer.get_status()
+iex> WeatherServer.get_forecast()                   # Defaults to Rocklin, CA.
+iex> WeatherServer.get_forecast("","","","12345")   # Schenectady, NY :-)
+iex> WeatherServer.get_status()
+iex> Ctrl-C Ctrl-C
+
+cd projects/richard/weather_page
+mix deps.get
+cd assets
+npm install
+cd ..
+mix compile
+mix phx.server    # To start the web server (with a dependant WeatherServer process)
+
+[Open your web browser and navigate to:]
+http://localhost:4000/weather
+
+Enjoy!
